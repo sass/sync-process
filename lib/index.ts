@@ -6,19 +6,33 @@ import * as fs from 'fs';
 import * as p from 'path';
 import * as stream from 'stream';
 import {Worker, WorkerOptions} from 'worker_threads';
+import * as worker_threads from 'worker_threads';
 
-import {SyncMessagePort} from './sync-message-port';
-import {Event, InternalEvent} from './event';
+import {SyncMessagePort} from 'sync-message-port';
 
-export {Event, ExitEvent, StderrEvent, StdoutEvent} from './event';
+import {ExitEvent, InternalEvent, StderrEvent, StdoutEvent} from './event';
 
-// TODO(nex3): Factor this out into its own package.
+export {ExitEvent, StderrEvent, StdoutEvent} from './event';
+
+/** Whether {@link object} can't be transferred between threads, only cloned. */
+function isMarkedAsUntransferable(object: unknown): boolean {
+  // TODO: Remove this check when we no longer support Node v20 (after
+  // 2026-04-30).
+  return 'isMarkedAsUntransferable' in worker_threads
+    ? // TODO - DefinitelyTyped/DefinitelyTyped#71033: Remove this cast
+      (worker_threads.isMarkedAsUntransferable as (object: unknown) => boolean)(
+        object,
+      )
+    : false;
+}
 
 /**
  * A child process that runs synchronously while also allowing the user to
  * interact with it before it shuts down.
  */
-export class SyncProcess {
+export class SyncProcess
+  implements Iterator<StderrEvent | StdoutEvent, ExitEvent | undefined>
+{
   /** The port that communicates with the worker thread. */
   private readonly port: SyncMessagePort;
 
@@ -35,7 +49,7 @@ export class SyncProcess {
   constructor(
     command: string,
     argsOrOptions?: string[] | Options,
-    options?: Options
+    options?: Options,
   ) {
     let args: string[];
     if (Array.isArray(argsOrOptions)) {
@@ -63,56 +77,36 @@ export class SyncProcess {
             type: 'stdin',
             data: chunk as Buffer,
           },
-          [chunk.buffer]
+          isMarkedAsUntransferable(chunk.buffer) ? undefined : [chunk.buffer],
         );
         callback();
       },
+      final: () => this.port.postMessage({type: 'stdinClosed'}),
     });
-
-    // Unfortunately, there's no built-in event or callback that will reliably
-    // *synchronously* notify us that the stdin stream has been closed. (The
-    // `final` callback works in Node v16 but not v14.) Instead, we wrap the
-    // methods themselves that are used to close the stream.
-    const oldEnd = this.stdin.end.bind(this.stdin) as (
-      a1?: unknown,
-      a2?: unknown,
-      a3?: unknown
-    ) => void;
-    this.stdin.end = ((a1?: unknown, a2?: unknown, a3?: unknown) => {
-      oldEnd(a1, a2, a3);
-      this.port.postMessage({type: 'stdinClosed'});
-    }) as typeof this.stdin.end;
-
-    const oldDestroy = this.stdin.destroy.bind(this.stdin) as (
-      a1?: unknown
-    ) => void;
-    this.stdin.destroy = ((a1?: unknown) => {
-      oldDestroy(a1);
-      this.port.postMessage({type: 'stdinClosed'});
-    }) as typeof this.stdin.destroy;
   }
 
   /**
    * Blocks until the child process is ready to emit another event, then returns
-   * that event.
+   * that event. This will return an [IteratorReturnResult] with an [ExitEvent]
+   * once when the process exits. If it's called again after that, it will
+   * return `{done: true}` without a value.
    *
    * If there's an error running the child process, this will throw that error.
-   * This may not be called after it emits an `ExitEvent` or throws an error.
    */
-  yield(): Event {
-    if (this.stdin.destroyed) {
-      throw new Error(
-        "Can't call SyncProcess.yield() after the process has exited."
-      );
-    }
+  next(): IteratorResult<StdoutEvent | StderrEvent, ExitEvent | undefined> {
+    if (this.stdin.destroyed) return {done: true, value: undefined};
 
     const message = this.port.receiveMessage() as InternalEvent;
     switch (message.type) {
       case 'stdout':
-        return {type: 'stdout', data: Buffer.from(message.data.buffer)};
+        return {
+          value: {type: 'stdout', data: Buffer.from(message.data.buffer)},
+        };
 
       case 'stderr':
-        return {type: 'stderr', data: Buffer.from(message.data.buffer)};
+        return {
+          value: {type: 'stderr', data: Buffer.from(message.data.buffer)},
+        };
 
       case 'error':
         this.close();
@@ -120,7 +114,7 @@ export class SyncProcess {
 
       case 'exit':
         this.close();
-        return message;
+        return {done: true, value: message};
     }
   }
 
@@ -152,7 +146,7 @@ export class SyncProcess {
  */
 function spawnWorker(
   fileWithoutExtension: string,
-  options: WorkerOptions
+  options: WorkerOptions,
 ): Worker {
   // The released version always spawns the JS worker. The TS worker is only
   // used for development.
@@ -166,7 +160,7 @@ function spawnWorker(
         require('ts-node').register();
         require(${JSON.stringify(tsFile)});
       `,
-      {...options, eval: true}
+      {...options, eval: true},
     );
   }
 
