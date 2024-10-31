@@ -11,7 +11,8 @@ import {
 import {SpawnOptionsWithoutStdio, spawn} from 'child_process';
 import {strict as assert} from 'assert';
 
-import {SyncMessagePort} from './sync-message-port';
+import {SyncMessagePort} from 'sync-message-port';
+
 import {InternalEvent} from './event';
 
 const port = new SyncMessagePort(workerData.port as MessagePort);
@@ -24,7 +25,7 @@ function emit(event: InternalEvent, transferList?: TransferListItem[]): void {
 const process = spawn(
   workerData.command as string,
   workerData.args as string[],
-  workerData.options as SpawnOptionsWithoutStdio | undefined
+  workerData.options as SpawnOptionsWithoutStdio | undefined,
 );
 
 port.on('message', message => {
