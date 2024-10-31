@@ -30,7 +30,7 @@ function isMarkedAsUntransferable(object: unknown): boolean {
  * A child process that runs synchronously while also allowing the user to
  * interact with it before it shuts down.
  */
-export class SyncProcess
+export class SyncChildProcess
   implements Iterator<StderrEvent | StdoutEvent, ExitEvent | undefined>
 {
   /** The port that communicates with the worker thread. */

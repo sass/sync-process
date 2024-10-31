@@ -5,9 +5,9 @@
 import * as fs from 'fs';
 import * as p from 'path';
 
-import {ExitEvent, StderrEvent, StdoutEvent, SyncProcess} from './index';
+import {ExitEvent, StderrEvent, StdoutEvent, SyncChildProcess} from './index';
 
-describe('SyncProcess', () => {
+describe('SyncChildProcess', () => {
   describe('stdio', () => {
     it('emits stdout', () => {
       withJSProcess('console.log("hello, world!");', node => {
@@ -70,7 +70,7 @@ describe('SyncProcess', () => {
 
   it('passes options to the subprocess', () => {
     withJSFile('console.log(process.env.SYNC_PROCESS_TEST);', file => {
-      const node = new SyncProcess(process.argv0, [file], {
+      const node = new SyncChildProcess(process.argv0, [file], {
         env: {...process.env, SYNC_PROCESS_TEST: 'abcdef'},
       });
       expectStdout(node.next(), 'abcdef\n');
@@ -134,15 +134,15 @@ function expectExit(
 }
 
 /**
- * Starts a `SyncProcess` running a JS file with the given `contents` and passes
- * it to `callback`.
+ * Starts a `SyncChildProcess` running a JS file with the given `contents` and
+ * passes it to `callback`.
  */
 function withJSProcess(
   contents: string,
-  callback: (process: SyncProcess) => void,
+  callback: (process: SyncChildProcess) => void,
 ): void {
   return withJSFile(contents, file => {
-    const node = new SyncProcess(process.argv0, [file]);
+    const node = new SyncChildProcess(process.argv0, [file]);
 
     try {
       callback(node);
