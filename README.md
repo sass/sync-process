@@ -1,25 +1,25 @@
-# `sync-process`
+# `sync-child-process`
 
-This package exposes a `SyncProcess` class that allows Node.js to run
-a subprocess synchronously *and* interactively.
+This package exposes a `SyncChildProcess` class that allows Node.js to run a
+subprocess synchronously *and* interactively.
 
 ## Usage
 
-Use `new SyncProcess()` to start running a subprocess. This supports the same
-API as [`child_process.spawn()`] other than a few options. You can send input to
-the process using `process.stdin`, and receive events from it (stdout, stderr,
-or exit) using `process.next()`. This implements [the iterator protocol], but
-*not* the iterable protocol because it's intrinsically stateful.
+Use `new SyncChildProcess()` to start running a subprocess. This supports the
+same API as [`child_process.spawn()`] other than a few options. You can send
+input to the process using `process.stdin`, and receive events from it (stdout,
+stderr, or exit) using `process.next()`. This implements [the iterator
+protocol], but *not* the iterable protocol because it's intrinsically stateful.
 
 [the iterator protocol]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_iterator_protocol
 [`child_process.spawn()`]: https://nodejs.org/api/child_process.html#child_processspawncommand-args-options
 
 ```js
-import {SyncProcess} from 'sync-process';
+import {SyncChildProcess} from 'sync-child-process';
 // or
-// const {SyncProcess} = require('sync-process');
+// const {SyncChildProcess} = require('sync-child-process');
 
-const node = new SyncProcess('node', ['--interactive']);
+const node = new SyncChildProcess('node', ['--interactive']);
 
 for (;;) {
   if (node.next().value.data.toString().endsWith('> ')) break;
